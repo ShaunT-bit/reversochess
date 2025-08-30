@@ -1,102 +1,36 @@
-import { useState } from 'react';
-import { ChessSquare } from './ChessSquare';
-import { Board, Position, GameState, PieceColor } from '../types/chess';
-import { initialBoard, getValidMoves, makeMove, getPieceAt } from '../utils/chessLogic';
-import { toast } from 'sonner';
+import { useState, useEffect } from 'react';
+import { ChessSquare } from './ChessSquare.tsx';
+import { Position } from '../types/chess.ts';
+import { createChessGame } from '../utils/chessLogic.ts';
 
 export const ChessBoard = () => {
-  const [gameState, setGameState] = useState<GameState>({
-    board: initialBoard,
-    currentPlayer: 'white',
-    selectedSquare: null,
-    validMoves: [],
-    gameStatus: 'playing'
-  });
+  const [game] = useState(() => createChessGame());
+  const [, forceUpdate] = useState({});
 
-  const handleSquareClick = (position: Position) => {
-    const { board, currentPlayer, selectedSquare, validMoves } = gameState;
-    const clickedPiece = getPieceAt(board, position);
-
-    // If no square is selected
-    if (!selectedSquare) {
-      if (clickedPiece && clickedPiece.color === currentPlayer) {
-        const moves = getValidMoves(board, position, clickedPiece);
-        setGameState(prev => ({
-          ...prev,
-          selectedSquare: position,
-          validMoves: moves
-        }));
-      }
-      return;
-    }
-
-    // If clicking the same square, deselect
-    if (selectedSquare.row === position.row && selectedSquare.col === position.col) {
-      setGameState(prev => ({
-        ...prev,
-        selectedSquare: null,
-        validMoves: []
-      }));
-      return;
-    }
-
-    // If clicking a valid move
-    const isValidMove = validMoves.some(
-      move => move.row === position.row && move.col === position.col
-    );
-
-    if (isValidMove) {
-      const newBoard = makeMove(board, selectedSquare, position);
-      const nextPlayer: PieceColor = currentPlayer === 'white' ? 'black' : 'white';
-      
-      setGameState({
-        board: newBoard,
-        currentPlayer: nextPlayer,
-        selectedSquare: null,
-        validMoves: [],
-        gameStatus: 'playing'
-      });
-
-      if (clickedPiece) {
-        toast(`${currentPlayer} captured ${clickedPiece.type}!`);
-      }
-    } else if (clickedPiece && clickedPiece.color === currentPlayer) {
-      // Select a different piece of the same color
-      const moves = getValidMoves(board, position, clickedPiece);
-      setGameState(prev => ({
-        ...prev,
-        selectedSquare: position,
-        validMoves: moves
-      }));
-    } else {
-      // Invalid move
-      setGameState(prev => ({
-        ...prev,
-        selectedSquare: null,
-        validMoves: []
-      }));
-    }
-  };
-
-  const resetGame = () => {
-    setGameState({
-      board: initialBoard,
-      currentPlayer: 'white',
-      selectedSquare: null,
-      validMoves: [],
-      gameStatus: 'playing'
+  useEffect(() => {
+    const unsubscribe = game.addListener(() => {
+      forceUpdate({});
     });
-    toast('New game started!');
-  };
+    return unsubscribe;
+  }, [game]);
 
   return (
     <div className="flex flex-col items-center gap-6">
       <div className="flex items-center gap-4">
         <h2 className="text-2xl font-bold text-foreground">
-          Current Player: <span className="capitalize text-accent">{gameState.currentPlayer}</span>
+          Current Player: <span className="capitalize text-accent">{game.gameState.currentPlayer}</span>
         </h2>
+        {game.gameState.gameStatus === 'check' && (
+          <span className="text-red-500 font-bold">CHECK!</span>
+        )}
+        {game.gameState.gameStatus === 'checkmate' && (
+          <span className="text-red-600 font-bold">CHECKMATE!</span>
+        )}
+        {game.gameState.gameStatus === 'stalemate' && (
+          <span className="text-yellow-600 font-bold">STALEMATE!</span>
+        )}
         <button
-          onClick={resetGame}
+          onClick={game.resetGame}
           className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
         >
           New Game
@@ -104,15 +38,15 @@ export const ChessBoard = () => {
       </div>
       
       <div className="grid grid-cols-8 gap-0 border-4 border-chess-board-border rounded-lg overflow-hidden shadow-2xl">
-        {gameState.board.map((row, rowIndex) =>
+        {game.gameState.board.map((row, rowIndex) =>
           row.map((piece, colIndex) => {
             const position = { row: rowIndex, col: colIndex };
             const isLight = (rowIndex + colIndex) % 2 === 0;
             const isSelected = 
-              gameState.selectedSquare &&
-              gameState.selectedSquare.row === rowIndex &&
-              gameState.selectedSquare.col === colIndex;
-            const isValidMove = gameState.validMoves.some(
+              game.gameState.selectedSquare &&
+              game.gameState.selectedSquare.row === rowIndex &&
+              game.gameState.selectedSquare.col === colIndex;
+            const isValidMove = game.gameState.validMoves.some(
               move => move.row === rowIndex && move.col === colIndex
             );
 
@@ -124,7 +58,7 @@ export const ChessBoard = () => {
                 isLight={isLight}
                 isSelected={!!isSelected}
                 isValidMove={isValidMove}
-                onClick={handleSquareClick}
+                onClick={game.handleSquareClick}
               />
             );
           })
@@ -133,6 +67,12 @@ export const ChessBoard = () => {
       
       <div className="text-center text-muted-foreground">
         <p>Click a piece to select it, then click a highlighted square to move.</p>
+        {game.gameState.gameStatus === 'checkmate' && (
+          <p className="text-red-600 font-bold mt-2">Game Over - {game.gameState.currentPlayer === 'white' ? 'Black' : 'White'} Wins!</p>
+        )}
+        {game.gameState.gameStatus === 'stalemate' && (
+          <p className="text-yellow-600 font-bold mt-2">Game Over - Draw!</p>
+        )}
       </div>
     </div>
   );

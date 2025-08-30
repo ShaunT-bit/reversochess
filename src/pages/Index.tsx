@@ -1,4 +1,4 @@
-import { ChessBoard } from '../components/ChessBoard';
+import { ChessBoard } from '../components/ChessBoard.tsx';
 import { Toaster } from 'sonner';
 
 const Index = () => {

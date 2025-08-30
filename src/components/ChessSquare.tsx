@@ -1,5 +1,5 @@
-import { ChessPiece } from './ChessPiece';
-import { ChessPiece as ChessPieceType, Position } from '../types/chess';
+import { ChessPiece } from './ChessPiece.tsx';
+import { ChessPiece as ChessPieceType, Position } from '../types/chess.ts';
 
 interface ChessSquareProps {
   piece: ChessPieceType | null;
