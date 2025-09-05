@@ -1,5 +1,6 @@
 import { ChessBoard } from '../components/ChessBoard.tsx';
 import { Toaster } from 'sonner';
+import Rules from "./Rules.tsx";
 
 const Index = () => {
   return (
@@ -13,6 +14,8 @@ const Index = () => {
         <main className="flex justify-center">
           <ChessBoard />
         </main>
+          <Rules />
+
       </div>
       <Toaster position="top-right" />
     </div>

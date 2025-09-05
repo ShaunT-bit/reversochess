@@ -67,13 +67,12 @@ export const getValidMoves = (board: Board, from: Position, piece: ChessPiece): 
 
     return moves.filter(to => !wouldMoveResultInCheck(board, from, to, piece.color));
 };
-
-// 🟢 Pawn: moves diagonally, captures only facing pawn
+// 🟢 Pawn: moves diagonally if empty, captures forward (any enemy piece)
 const getPawnMoves = (board: Board, from: Position, color: PieceColor): Position[] => {
     const moves: Position[] = [];
     const direction = color === "white" ? -1 : 1;
 
-    // Diagonal moves
+    // Diagonal moves (only into empty squares)
     const diagLeft = { row: from.row + direction, col: from.col - 1 };
     const diagRight = { row: from.row + direction, col: from.col + 1 };
 
@@ -83,17 +82,18 @@ const getPawnMoves = (board: Board, from: Position, color: PieceColor): Position
         }
     });
 
-    // Capture facing pawn
+    // Forward capture (any enemy piece, not just pawns)
     const forward = { row: from.row + direction, col: from.col };
     const target = getPieceAt(board, forward);
-    if (isValidPosition(forward) && target && target.type === "pawn" && target.color !== color) {
+    if (isValidPosition(forward) && target && target.color !== color) {
         moves.push(forward);
     }
 
     return moves;
 };
 
-// 🟢 Rook: moves only 2 steps at a time
+
+// 🟢 Rook: moves only to 2nd, 4th, 6th squares in each direction
 const getRookMoves = (board: Board, from: Position, color: PieceColor): Position[] => {
     const moves: Position[] = [];
     const directions = [
@@ -104,43 +104,91 @@ const getRookMoves = (board: Board, from: Position, color: PieceColor): Position
     ];
 
     directions.forEach(([dRow, dCol]) => {
-        for (let i = 1; i < 8; i++) {  // step 1 square at a time
+        for (let i = 1; i < 8; i++) {
             const pos = { row: from.row + dRow * i, col: from.col + dCol * i };
             if (!isValidPosition(pos)) break;
 
             const piece = getPieceAt(board, pos);
-            if (!piece) {
-                moves.push(pos);
-            } else {
-                if (piece.color !== color) moves.push(pos); // capture
-                break; // stop after hitting any piece
+
+            // ✅ Only allow even-numbered steps (2, 4, 6)
+            if (i % 2 === 0) {
+                if (!piece) {
+                    moves.push(pos);
+                } else {
+                    if (piece.color !== color) moves.push(pos); // capture
+                    break; // stop after hitting any piece
+                }
             }
+
+            if (piece) break; // stop if blocked before reaching further
         }
     });
 
     return moves;
 };
 
-
-// 🟢 Knight: checkers-style jumps
+// 🟢 Knight: random move (rook/bishop/knight) within 3x3 area
 const getKnightMoves = (board: Board, from: Position, color: PieceColor): Position[] => {
     const moves: Position[] = [];
-    const jumpDirs = [[-2,0],[2,0],[0,-2],[0,2]];
 
-    jumpDirs.forEach(([dRow, dCol]) => {
-        const mid = { row: from.row + dRow/2, col: from.col + dCol/2 };
-        const target = { row: from.row + dRow, col: from.col + dCol };
-        if (isValidPosition(mid) && isValidPosition(target)) {
-            const midPiece = getPieceAt(board, mid);
-            const targetPiece = getPieceAt(board, target);
-            if (midPiece && midPiece.color !== color && (!targetPiece || targetPiece.color !== color)) {
-                moves.push(target);
+    // Randomly choose mode: rook, bishop, or knight
+    const modes = ["rook", "bishop", "knight"];
+    const chosenMode = modes[Math.floor(Math.random() * modes.length)];
+
+    if (chosenMode === "rook") {
+        // Rook-like moves in 3x3 area
+        const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+        directions.forEach(([dRow, dCol]) => {
+            for (let i = 1; i <= 2; i++) { // only 1 step (3x3 area)
+                const pos = { row: from.row + dRow * i, col: from.col + dCol * i };
+                if (!isValidPosition(pos)) break;
+                const piece = getPieceAt(board, pos);
+                if (!piece || piece.color !== color) moves.push(pos);
             }
-        }
-    });
+        });
+    }
+
+    if (chosenMode === "bishop") {
+        // Bishop-like moves in 3x3 area
+        const directions = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+        directions.forEach(([dRow, dCol]) => {
+            for (let i = 1; i <= 2; i++) { // only 1 step (3x3 area)
+                const pos = { row: from.row + dRow * i, col: from.col + dCol * i };
+                if (!isValidPosition(pos)) break;
+                const piece = getPieceAt(board, pos);
+                if (!piece || piece.color !== color) moves.push(pos);
+            }
+        });
+    }
+
+    if (chosenMode === "knight") {
+        // Knight-like moves but restricted to 3x3 area
+        const knightMoves = [
+            { row: from.row + 2, col: from.col + 1 },
+            { row: from.row + 2, col: from.col - 1 },
+            { row: from.row - 2, col: from.col + 1 },
+            { row: from.row - 2, col: from.col - 1 },
+            { row: from.row + 1, col: from.col + 2 },
+            { row: from.row + 1, col: from.col - 2 },
+            { row: from.row - 1, col: from.col + 2 },
+            { row: from.row - 1, col: from.col - 2 },
+        ];
+
+        knightMoves.forEach((pos) => {
+            // ✅ only allow moves inside 3x3 area around the knight
+            if (Math.abs(pos.row - from.row) <= 1 && Math.abs(pos.col - from.col) <= 1) {
+                if (isValidPosition(pos)) {
+                    const piece = getPieceAt(board, pos);
+                    if (!piece || piece.color !== color) moves.push(pos);
+                }
+            }
+        });
+    }
 
     return moves;
 };
+
+
 
 // 🟢 Bishop: normal, but swaps with random pawn after capture
 const getBishopMoves = (board: Board, from: Position, color: PieceColor): Position[] => {
@@ -178,7 +226,38 @@ const getQueenMoves = (board: Board, from: Position, color: PieceColor): Positio
             if (!piece || piece.color !== color) moves.push(oneStep);
         }
     } else {
-        moves = [...getRookMoves(board, from, color), ...getBishopMoves(board, from, color)];
+        // Full queen logic = rook + bishop directions
+        const directions = [
+            [1, 0],   // down
+            [-1, 0],  // up
+            [0, 1],   // right
+            [0, -1],  // left
+            [1, 1],   // down-right
+            [1, -1],  // down-left
+            [-1, 1],  // up-right
+            [-1, -1], // up-left
+        ];
+
+        for (const [dRow, dCol] of directions) {
+            let r = from.row + dRow;
+            let c = from.col + dCol;
+
+            while (isValidPosition({ row: r, col: c })) {
+                const piece = getPieceAt(board, { row: r, col: c });
+
+                if (!piece) {
+                    moves.push({ row: r, col: c }); // empty square
+                } else {
+                    if (piece.color !== color) {
+                        moves.push({ row: r, col: c }); // capture
+                    }
+                    break; // stop when hitting any piece
+                }
+
+                r += dRow;
+                c += dCol;
+            }
+        }
     }
 
     return moves;
